@@ -1,4 +1,4 @@
-package com.example.examplemod;
+package com.boardmod;
 
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;

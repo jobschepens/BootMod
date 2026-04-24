@@ -46,7 +46,9 @@ displayName="${mod_name}" #mandatory
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Example mod description.
+Adds a Snowboard and Skateboard item. Right-click to place under your feet and ride!
+Skateboard: 10 blocks/sec on any surface. Snowboard: 10 blocks/sec on snow.
+Craft with planks. Shift to dismount.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
