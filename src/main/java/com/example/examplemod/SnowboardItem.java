@@ -19,11 +19,11 @@ public class SnowboardItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
 
         if (!level.isClientSide()) {
-            // Spawn snowboard entity slightly in front of/below player, then mount
+            // Spawn snowboard entity exactly at player feet, then mount
             SnowboardEntity entity = BootMod.SNOWBOARD_ENTITY.get().create(level);
             if (entity != null) {
                 Vec3 pos = player.position();
-                entity.moveTo(pos.x, pos.y - 0.2, pos.z, player.getYRot(), 0);
+                entity.moveTo(pos.x, pos.y, pos.z, player.getYRot(), 0);
                 level.addFreshEntity(entity);
                 player.startRiding(entity, true);
 

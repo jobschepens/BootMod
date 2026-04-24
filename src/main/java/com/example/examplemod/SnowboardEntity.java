@@ -1,28 +1,48 @@
 package com.example.examplemod;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
+
+import java.lang.reflect.Field;
 
 public class SnowboardEntity extends Entity {
 
     // 10 blocks/sec = 0.5 blocks/tick
-    private static final double SNOW_SPEED = 0.5;
+    private static final double SNOW_SPEED  = 0.5;
     private static final double NORMAL_SPEED = 0.1;
+
+    private static final Field JUMPING_FIELD;
+    static {
+        try {
+            JUMPING_FIELD = LivingEntity.class.getDeclaredField("jumping");
+            JUMPING_FIELD.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException("Could not find jumping field", e);
+        }
+    }
+
+    private static boolean isJumping(Player rider) {
+        try {
+            return (boolean) JUMPING_FIELD.get(rider);
+        } catch (IllegalAccessException e) {
+            return false;
+        }
+    }
 
     public SnowboardEntity(EntityType<?> type, Level level) {
         super(type, level);
-        this.noPhysics = false;
-        this.setMaxUpStep(0.6f);
     }
 
     @Override
@@ -36,52 +56,63 @@ public class SnowboardEntity extends Entity {
 
         if (level().isClientSide()) return;
 
-        // If no rider → remove entity and drop the snowboard item
+        // No rider → drop item and remove entity
         if (this.getPassengers().isEmpty()) {
-            if (!level().isClientSide()) {
-                this.spawnAtLocation(new ItemStack(BootMod.SNOWBOARD.get()));
-            }
+            this.spawnAtLocation(new ItemStack(BootMod.SNOWBOARD.get()));
             this.discard();
             return;
         }
 
-        // Gravity
-        if (!this.onGround()) {
-            this.setDeltaMovement(this.getDeltaMovement().add(0, -0.08, 0));
-        }
+        Entity passenger = this.getPassengers().get(0);
+        if (!(passenger instanceof Player rider)) return;
 
-        this.move(MoverType.SELF, this.getDeltaMovement());
-        this.setDeltaMovement(this.getDeltaMovement().scale(0.91));
-    }
-
-    @Override
-    protected Vec3 getRiddenInput(Player rider, Vec3 rawInput) {
-        float forward = rider.xxa != 0 ? rider.xxa * 0.5f : rider.zza;
-        return new Vec3(0.0, 0.0, forward > 0 ? 1.0 : (forward < 0 ? -0.5 : 0.0));
-    }
-
-    @Override
-    protected double getRiddenSpeed(Player rider) {
-        return isOnSnow() ? SNOW_SPEED : NORMAL_SPEED;
-    }
-
-    @Override
-    protected void tickRidden(Player rider, Vec3 input) {
-        // Steer by rider's yaw
+        // Steer by rider yaw
         this.setYRot(rider.getYRot());
         this.yRotO = this.getYRot();
-        this.setXRot(rider.getXRot() * 0.5f);
 
-        double speed = getRiddenSpeed(rider);
-        double vx = -Math.sin(Math.toRadians(this.getYRot())) * input.z * speed;
-        double vz =  Math.cos(Math.toRadians(this.getYRot())) * input.z * speed;
+        // Read movement input from the rider
+        float forward = rider.zza;  // 1 = W, -1 = S
+        float strafe  = rider.xxa;  // 1 = A, -1 = D
 
+        double speed = isOnSnow() ? SNOW_SPEED : NORMAL_SPEED;
+        double yawRad = Math.toRadians(this.getYRot());
+
+        double vx = (-Math.sin(yawRad) * forward + -Math.cos(yawRad) * strafe) * speed;
+        double vz = ( Math.cos(yawRad) * forward +  Math.sin(yawRad) * strafe) * speed;
+
+        // Gravity & jumping
         double vy = this.getDeltaMovement().y;
-        if (this.onGround()) vy = 0;
-        vy -= 0.08; // gravity
+        if (this.onGround()) {
+            vy = 0;
+            // Jump: Space bar sets jumping flag on the player
+            if (isJumping(rider)) {
+                vy = 0.42;
+            }
+        } else {
+            vy -= 0.08;
+        }
         vy = Math.max(vy, -0.5);
 
         this.setDeltaMovement(vx, vy, vz);
+        this.move(MoverType.SELF, this.getDeltaMovement());
+
+        // Friction
+        this.setDeltaMovement(this.getDeltaMovement().multiply(0.91, 1.0, 0.91));
+
+        // No fall damage for passengers
+        this.resetFallDistance();
+        rider.resetFallDistance();
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        // Entity itself is indestructible (player dismounts via Shift)
+        return false;
+    }
+
+    @Override
+    public Vec3 getDismountLocationForPassenger(net.minecraft.world.entity.LivingEntity passenger) {
+        return this.position().add(1.2, 0, 0);
     }
 
     @Override
@@ -112,3 +143,4 @@ public class SnowboardEntity extends Entity {
         return dist < 4096;
     }
 }
+
