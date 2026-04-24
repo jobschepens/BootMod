@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    "PPP",
+    "   "
+  ],
+  "key": {
+    "P": {
+      "tag": "minecraft:planks"
+    }
+  },
+  "result": {
+    "id": "bootmod:snowboard",
+    "count": 1
+  }
+}

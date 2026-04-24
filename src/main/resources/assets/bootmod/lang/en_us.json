@@ -1,7 +1,8 @@
 {
   "itemGroup.bootmod": "Example Mod Tab",
   "block.bootmod.example_block": "Example Block",
-  "item.bootmod.example_item": "Example Item",
+  "item.bootmod.rubin": "Rubin",
+  "item.bootmod.snowboard": "Snowboard",
 
   "bootmod.configuration.title": "BootMod Configs",
   "bootmod.configuration.section.bootmod.common.toml": "BootMod Configs",
