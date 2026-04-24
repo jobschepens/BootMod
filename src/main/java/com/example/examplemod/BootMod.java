@@ -4,15 +4,11 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -21,7 +17,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -33,7 +28,6 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -52,6 +46,8 @@ public class BootMod {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
     // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "bootmod" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
+    // Create a Deferred Register to hold EntityTypes
+    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(BuiltInRegistries.ENTITY_TYPE, MODID);
 
     // Creates a new Block with the id "bootmod:example_block", combining the namespace and path
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
@@ -65,10 +61,13 @@ public class BootMod {
     public static final DeferredItem<SnowboardItem> SNOWBOARD = ITEMS.registerItem("snowboard",
             SnowboardItem::new, new Item.Properties());
 
-    // Speed modifier applied while riding the snowboard on snow.
-    // Base MOVEMENT_SPEED = 0.1 ≈ 4.317 blocks/s; target = 10 blocks/s → multiplier ≈ 2.317 → modifier = 1.317
-    private static final ResourceLocation SNOWBOARD_SPEED_ID = ResourceLocation.fromNamespaceAndPath(MODID, "snowboard_speed");
-    private static final double SNOWBOARD_SPEED_MODIFIER = 1.317;
+    // Registers the SnowboardEntity type
+    public static final DeferredHolder<EntityType<?>, EntityType<SnowboardEntity>> SNOWBOARD_ENTITY =
+            ENTITY_TYPES.register("snowboard", () -> EntityType.Builder
+                    .<SnowboardEntity>of(SnowboardEntity::new, MobCategory.MISC)
+                    .sized(1.0f, 0.4f)
+                    .clientTrackingRange(10)
+                    .build("bootmod:snowboard"));
 
     // Creates a creative tab with the id "bootmod:example_tab" for the test item, that is placed after the combat tab
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder()
@@ -92,6 +91,8 @@ public class BootMod {
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
+        // Register the Deferred Register to the mod event bus so entity types get registered
+        ENTITY_TYPES.register(modEventBus);
 
         // Register ourselves for server and other game events we are interested in.
         // Note that this is necessary if and only if we want *this* class (BootMod) to respond directly to events.
@@ -132,53 +133,5 @@ public class BootMod {
         LOGGER.info("HELLO from server starting");
     }
 
-    // Apply/remove snowboard speed boost each tick on the server
-    @SubscribeEvent
-    public void onPlayerTick(PlayerTickEvent.Post event) {
-        Player player = event.getEntity();
-        if (player.level().isClientSide()) return;
-
-        boolean snowboarding = player.getPersistentData().getBoolean("snowboarding");
-
-        boolean hasSnowboard = false;
-        for (ItemStack s : player.getInventory().items) {
-            if (s.is(SNOWBOARD.get())) { hasSnowboard = true; break; }
-        }
-        if (!hasSnowboard) {
-            hasSnowboard = player.getOffhandItem().is(SNOWBOARD.get());
-        }
-
-        // If the item left the inventory, cancel snowboarding mode
-        if (!hasSnowboard) {
-            player.getPersistentData().putBoolean("snowboarding", false);
-        }
-
-        boolean onSnow = isOnSnow(player);
-
-        AttributeInstance speedAttr = player.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speedAttr == null) return;
-
-        if (snowboarding && hasSnowboard && onSnow) {
-            if (!speedAttr.hasModifier(SNOWBOARD_SPEED_ID)) {
-                speedAttr.addTransientModifier(new AttributeModifier(
-                        SNOWBOARD_SPEED_ID, SNOWBOARD_SPEED_MODIFIER,
-                        AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
-            }
-        } else {
-            speedAttr.removeModifier(SNOWBOARD_SPEED_ID);
-        }
-    }
-
-    private static boolean isOnSnow(Player player) {
-        BlockPos pos = player.blockPosition();
-        // Check the block at foot level (snow layers) and the block below
-        return isSnowBlock(player.level().getBlockState(pos))
-                || isSnowBlock(player.level().getBlockState(pos.below()));
-    }
-
-    private static boolean isSnowBlock(BlockState state) {
-        return state.is(Blocks.SNOW_BLOCK)
-                || state.is(Blocks.SNOW)
-                || state.is(Blocks.POWDER_SNOW);
-    }
 }
+

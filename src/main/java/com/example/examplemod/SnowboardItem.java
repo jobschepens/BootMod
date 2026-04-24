@@ -1,16 +1,14 @@
 package com.example.examplemod;
 
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 public class SnowboardItem extends Item {
-
-    private static final String NBT_KEY = "snowboarding";
 
     public SnowboardItem(Properties properties) {
         super(properties);
@@ -21,16 +19,18 @@ public class SnowboardItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
 
         if (!level.isClientSide()) {
-            boolean current = player.getPersistentData().getBoolean(NBT_KEY);
-            boolean next = !current;
-            player.getPersistentData().putBoolean(NBT_KEY, next);
+            // Spawn snowboard entity slightly in front of/below player, then mount
+            SnowboardEntity entity = BootMod.SNOWBOARD_ENTITY.get().create(level);
+            if (entity != null) {
+                Vec3 pos = player.position();
+                entity.moveTo(pos.x, pos.y - 0.2, pos.z, player.getYRot(), 0);
+                level.addFreshEntity(entity);
+                player.startRiding(entity, true);
 
-            if (next) {
-                player.displayClientMessage(
-                        Component.translatable("item.bootmod.snowboard.equipped"), true);
-            } else {
-                player.displayClientMessage(
-                        Component.translatable("item.bootmod.snowboard.unequipped"), true);
+                // Consume one snowboard from the stack
+                if (!player.getAbilities().instabuild) {
+                    stack.shrink(1);
+                }
             }
         }
 
