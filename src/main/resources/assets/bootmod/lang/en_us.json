@@ -3,6 +3,8 @@
   "block.bootmod.example_block": "Example Block",
   "item.bootmod.rubin": "Rubin",
   "item.bootmod.snowboard": "Snowboard",
+  "item.bootmod.snowboard.equipped": "Snowboard equipped!",
+  "item.bootmod.snowboard.unequipped": "Snowboard removed.",
 
   "bootmod.configuration.title": "BootMod Configs",
   "bootmod.configuration.section.bootmod.common.toml": "BootMod Configs",
