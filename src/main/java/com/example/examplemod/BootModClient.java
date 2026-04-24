@@ -33,5 +33,6 @@ public class BootModClient {
     @SubscribeEvent
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(BootMod.SNOWBOARD_ENTITY.get(), SnowboardRenderer::new);
+        event.registerEntityRenderer(BootMod.SKATEBOARD_ENTITY.get(), SkateboardRenderer::new);
     }
 }

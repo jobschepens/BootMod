@@ -69,14 +69,27 @@ public class BootMod {
                     .clientTrackingRange(10)
                     .build("bootmod:snowboard"));
 
+    // Creates the skateboard item with the id "bootmod:skateboard"
+    public static final DeferredItem<SkateboardItem> SKATEBOARD = ITEMS.registerItem("skateboard",
+            SkateboardItem::new, new Item.Properties());
+
+    // Registers the SkateboardEntity type
+    public static final DeferredHolder<EntityType<?>, EntityType<SkateboardEntity>> SKATEBOARD_ENTITY =
+            ENTITY_TYPES.register("skateboard", () -> EntityType.Builder
+                    .<SkateboardEntity>of(SkateboardEntity::new, MobCategory.MISC)
+                    .sized(0.8f, 0.3f)
+                    .clientTrackingRange(10)
+                    .build("bootmod:skateboard"));
+
     // Creates a creative tab with the id "bootmod:example_tab" for the test item, that is placed after the combat tab
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.bootmod")) //The language key for the title of your CreativeModeTab
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> RUBIN.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
-                output.accept(RUBIN.get()); // Add the item to the tab. For your own tabs, this method is preferred over the event
+                output.accept(RUBIN.get());
                 output.accept(SNOWBOARD.get());
+                output.accept(SKATEBOARD.get());
             }).build());
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
