@@ -1,0 +1,13 @@
+{
+  "itemGroup.bootmod": "Example Mod Tab",
+  "block.bootmod.example_block": "Example Block",
+  "item.bootmod.example_item": "Example Item",
+
+  "bootmod.configuration.title": "BootMod Configs",
+  "bootmod.configuration.section.bootmod.common.toml": "BootMod Configs",
+  "bootmod.configuration.section.bootmod.common.toml.title": "BootMod Configs",
+  "bootmod.configuration.items": "Item List",
+  "bootmod.configuration.logDirtBlock": "Log Dirt Block",
+  "bootmod.configuration.magicNumberIntroduction": "Magic Number Text",
+  "bootmod.configuration.magicNumber": "Magic Number"
+}
