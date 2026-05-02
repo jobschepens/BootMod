@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " S ",
+    "SLS",
+    " L "
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:stick"
+    },
+    "L": {
+      "tag": "minecraft:logs"
+    }
+  },
+  "result": {
+    "id": "bootmod:steering_wheel",
+    "count": 1
+  }
+}

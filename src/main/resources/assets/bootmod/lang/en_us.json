@@ -2,5 +2,6 @@
   "itemGroup.bootmod": "BoardMod",
   "item.bootmod.snowboard": "Snowboard",
   "item.bootmod.skateboard": "Skateboard",
-  "item.bootmod.motorboat": "Motorboat"
+  "item.bootmod.motorboat": "Motorboat",
+  "item.bootmod.steering_wheel": "Steering Wheel"
 }

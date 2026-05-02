@@ -66,6 +66,16 @@ public class BootMod {
                     .clientTrackingRange(10)
                     .build("bootmod:motorboat"));
 
+    public static final DeferredItem<SteeringWheelItem> STEERING_WHEEL = ITEMS.registerItem("steering_wheel",
+            SteeringWheelItem::new, new Item.Properties());
+
+    public static final DeferredHolder<EntityType<?>, EntityType<RaftEntity>> RAFT_ENTITY =
+            ENTITY_TYPES.register("raft", () -> EntityType.Builder
+                    .<RaftEntity>of(RaftEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 0.75f)
+                    .clientTrackingRange(10)
+                    .build("bootmod:raft"));
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> BOARDMOD_TAB = CREATIVE_MODE_TABS.register("boardmod_tab", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.bootmod"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
@@ -74,6 +84,7 @@ public class BootMod {
                 output.accept(SNOWBOARD.get());
                 output.accept(SKATEBOARD.get());
                 output.accept(MOTORBOAT.get());
+                output.accept(STEERING_WHEEL.get());
             }).build());
 
     public BootMod(IEventBus modEventBus, ModContainer modContainer) {
