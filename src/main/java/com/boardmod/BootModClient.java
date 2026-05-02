@@ -16,5 +16,6 @@ public class BootModClient {
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(BootMod.SNOWBOARD_ENTITY.get(), SnowboardRenderer::new);
         event.registerEntityRenderer(BootMod.SKATEBOARD_ENTITY.get(), SkateboardRenderer::new);
+        event.registerEntityRenderer(BootMod.MOTORBOAT_ENTITY.get(), MotorboatRenderer::new);
     }
 }

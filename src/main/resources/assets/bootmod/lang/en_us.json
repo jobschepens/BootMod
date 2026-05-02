@@ -1,5 +1,6 @@
 {
   "itemGroup.bootmod": "BoardMod",
   "item.bootmod.snowboard": "Snowboard",
-  "item.bootmod.skateboard": "Skateboard"
+  "item.bootmod.skateboard": "Skateboard",
+  "item.bootmod.motorboat": "Motorboat"
 }

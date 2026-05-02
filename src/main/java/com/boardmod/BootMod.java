@@ -56,6 +56,16 @@ public class BootMod {
                     .clientTrackingRange(10)
                     .build("bootmod:skateboard"));
 
+    public static final DeferredItem<MotorboatItem> MOTORBOAT = ITEMS.registerItem("motorboat",
+            MotorboatItem::new, new Item.Properties());
+
+    public static final DeferredHolder<EntityType<?>, EntityType<MotorboatEntity>> MOTORBOAT_ENTITY =
+            ENTITY_TYPES.register("motorboat", () -> EntityType.Builder
+                    .<MotorboatEntity>of(MotorboatEntity::new, MobCategory.MISC)
+                    .sized(1.5f, 0.6f)
+                    .clientTrackingRange(10)
+                    .build("bootmod:motorboat"));
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> BOARDMOD_TAB = CREATIVE_MODE_TABS.register("boardmod_tab", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.bootmod"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
@@ -63,6 +73,7 @@ public class BootMod {
             .displayItems((parameters, output) -> {
                 output.accept(SNOWBOARD.get());
                 output.accept(SKATEBOARD.get());
+                output.accept(MOTORBOAT.get());
             }).build());
 
     public BootMod(IEventBus modEventBus, ModContainer modContainer) {
