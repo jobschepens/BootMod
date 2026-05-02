@@ -52,6 +52,11 @@ public class RaftEntity extends Entity {
     private double bbMinZ = -0.5, bbMaxZ = 0.5;
     private double bbMaxY = 1.0;
 
+    // Client-side smooth interpolation toward the latest server position
+    private int lerpSteps = 0;
+    private double lerpX, lerpY, lerpZ;
+    private double lerpYRot;
+
     public RaftEntity(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = false;
@@ -162,9 +167,31 @@ public class RaftEntity extends Entity {
     }
 
     @Override
+    public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
+        this.lerpX = x;
+        this.lerpY = y;
+        this.lerpZ = z;
+        this.lerpYRot = yRot;
+        this.lerpSteps = steps;
+    }
+
+    @Override
     public void tick() {
         super.tick();
-        if (level().isClientSide()) return;
+
+        // Client: smoothly interpolate toward the latest server position each tick
+        if (level().isClientSide()) {
+            if (lerpSteps > 0) {
+                double nx = this.getX() + (lerpX - this.getX()) / lerpSteps;
+                double ny = this.getY() + (lerpY - this.getY()) / lerpSteps;
+                double nz = this.getZ() + (lerpZ - this.getZ()) / lerpSteps;
+                float nyRot = (float)(this.getYRot() + (lerpYRot - this.getYRot()) / lerpSteps);
+                lerpSteps--;
+                this.setPos(nx, ny, nz);
+                this.setRot(nyRot, this.getXRot());
+            }
+            return;
+        }
 
         // If empty, just float in place
         if (this.getPassengers().isEmpty()) {

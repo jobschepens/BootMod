@@ -74,6 +74,7 @@ public class BootMod {
                     .<RaftEntity>of(RaftEntity::new, MobCategory.MISC)
                     .sized(2.0f, 0.75f)
                     .clientTrackingRange(10)
+                    .updateInterval(1)
                     .build("bootmod:raft"));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> BOARDMOD_TAB = CREATIVE_MODE_TABS.register("boardmod_tab", () -> CreativeModeTab.builder()
