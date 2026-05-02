@@ -22,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -45,6 +46,11 @@ public class RaftEntity extends Entity {
 
     // Client-side cache; invalidated whenever the synced data changes
     private List<RaftBlock> cachedBlocks = null;
+
+    // Bounding-box extents computed from raft blocks (relative offsets, default to 1-block)
+    private double bbMinX = -0.5, bbMaxX = 0.5;
+    private double bbMinZ = -0.5, bbMaxZ = 0.5;
+    private double bbMaxY = 1.0;
 
     public RaftEntity(EntityType<?> type, Level level) {
         super(type, level);
@@ -74,6 +80,24 @@ public class RaftEntity extends Entity {
         tag.put("blocks", list);
         this.entityData.set(BLOCKS_DATA, tag);
         this.cachedBlocks = blocks;
+        updateBlockExtents(blocks);
+    }
+
+    private void updateBlockExtents(List<RaftBlock> blocks) {
+        if (blocks.isEmpty()) return;
+        int minRX = 0, maxRX = 0, minRZ = 0, maxRZ = 0, maxRY = 0;
+        for (RaftBlock b : blocks) {
+            minRX = Math.min(minRX, b.rx());
+            maxRX = Math.max(maxRX, b.rx());
+            minRZ = Math.min(minRZ, b.rz());
+            maxRZ = Math.max(maxRZ, b.rz());
+            maxRY = Math.max(maxRY, b.ry());
+        }
+        bbMinX = minRX - 0.5;
+        bbMaxX = maxRX + 0.5;
+        bbMinZ = minRZ - 0.5;
+        bbMaxZ = maxRZ + 0.5;
+        bbMaxY = maxRY + 1.0;
     }
 
     public List<RaftBlock> getRaftBlocks() {
@@ -86,6 +110,7 @@ public class RaftEntity extends Entity {
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         if (BLOCKS_DATA.equals(key)) {
             cachedBlocks = null; // force re-parse on next access
+            updateBlockExtents(getRaftBlocks()); // recalculate AABB extents
         }
         super.onSyncedDataUpdated(key);
     }
@@ -118,6 +143,24 @@ public class RaftEntity extends Entity {
                 || level().getFluidState(pos.below()).is(FluidTags.WATER);
     }
 
+    /**
+     * Returns the Y that the entity should sit at so the bottom raft blocks rest
+     * exactly on the water surface (= top of the highest water block beneath us).
+     * Returns Double.NaN if no water block is found nearby.
+     */
+    private double getWaterSurfaceTargetY() {
+        int bx = (int) Math.floor(this.getX());
+        int bz = (int) Math.floor(this.getZ());
+        int startY = (int) Math.floor(this.getY()) + 2;
+        for (int dy = 0; dy <= 5; dy++) {
+            BlockPos p = new BlockPos(bx, startY - dy, bz);
+            if (level().getFluidState(p).is(FluidTags.WATER)) {
+                return p.getY() + 1.0; // exact top of the water block
+            }
+        }
+        return Double.NaN;
+    }
+
     @Override
     public void tick() {
         super.tick();
@@ -145,11 +188,15 @@ public class RaftEntity extends Entity {
         double vx = (-Math.sin(yawRad) * forward + -Math.cos(yawRad) * strafe) * speed;
         double vz = ( Math.cos(yawRad) * forward +  Math.sin(yawRad) * strafe) * speed;
 
-        double vy = this.getDeltaMovement().y;
+        double vy;
         if (onWater) {
-            vy = this.isInWater() ? Math.min(vy + 0.05, 0.1) : Math.max(vy - 0.02, -0.04);
+            // Spring toward water surface: converges without oscillation
+            double target = getWaterSurfaceTargetY();
+            vy = Double.isNaN(target)
+                    ? this.getDeltaMovement().y * 0.5
+                    : Math.max(-0.15, Math.min(0.15, (target - this.getY()) * 0.35));
         } else {
-            vy = this.onGround() ? 0 : Math.max(vy - 0.08, -0.5);
+            vy = this.onGround() ? 0 : Math.max(this.getDeltaMovement().y - 0.08, -0.5);
         }
 
         this.setDeltaMovement(vx, vy, vz);
@@ -163,13 +210,19 @@ public class RaftEntity extends Entity {
     }
 
     private void applyBuoyancy() {
-        if (!isOnOrInWater()) return;
-        double vy = this.getDeltaMovement().y;
-        vy = this.isInWater() ? Math.min(vy + 0.03, 0.05) : Math.max(vy - 0.01, -0.02);
+        double vy;
+        if (isOnOrInWater()) {
+            double target = getWaterSurfaceTargetY();
+            vy = Double.isNaN(target)
+                    ? this.getDeltaMovement().y * 0.5
+                    : Math.max(-0.1, Math.min(0.1, (target - this.getY()) * 0.2));
+        } else {
+            vy = Math.max(this.getDeltaMovement().y - 0.08, -0.5);
+        }
         this.setDeltaMovement(
-            this.getDeltaMovement().x * 0.95,
+            this.getDeltaMovement().x * 0.9,
             vy,
-            this.getDeltaMovement().z * 0.95
+            this.getDeltaMovement().z * 0.9
         );
         this.move(MoverType.SELF, this.getDeltaMovement());
     }
@@ -178,14 +231,35 @@ public class RaftEntity extends Entity {
     //  Interactions
     // -------------------------------------------------------------------------
 
-    /** Right-click with empty hand to remount. */
+    /** Dynamic AABB covering all raft blocks so players can stand anywhere on the structure. */
+    @Override
+    public void setPos(double x, double y, double z) {
+        super.setPos(x, y, z);
+        this.setBoundingBox(new AABB(x + bbMinX, y, z + bbMinZ, x + bbMaxX, y + bbMaxY, z + bbMaxZ));
+    }
+
+    /** Makes the raft physically solid — players cannot walk through it. */
+    @Override
+    public boolean canBeCollidedWith() {
+        return !this.isRemoved();
+    }
+
+    /** Right-click to remount. Returns sidedSuccess so the server call is always made. */
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        if (this.getPassengers().isEmpty() && !level().isClientSide()) {
-            player.startRiding(this, true);
-            return InteractionResult.SUCCESS;
+        if (this.getPassengers().isEmpty()) {
+            if (!level().isClientSide()) {
+                player.startRiding(this, true);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
         }
         return InteractionResult.PASS;
+    }
+
+    /** Makes the raft's bounding box solid so players can stand on it after dismounting. */
+    @Override
+    public boolean isPickable() {
+        return !this.isRemoved();
     }
 
     /** Hitting the raft with any tool breaks it and drops the blocks + steering wheel. */

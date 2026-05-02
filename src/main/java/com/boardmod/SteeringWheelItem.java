@@ -51,12 +51,15 @@ public class SteeringWheelItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        // Collect block data relative to clicked position (= future entity origin)
+        // Find the minimum Y in the structure → entity origin sits at the bottom layer (= water surface)
+        int minY = structure.stream().mapToInt(BlockPos::getY).min().orElse(clickedPos.getY());
+
+        // Collect block data: X/Z relative to clicked block, Y relative to minY
         List<RaftEntity.RaftBlock> raftBlocks = new ArrayList<>();
         for (BlockPos pos : structure) {
             raftBlocks.add(new RaftEntity.RaftBlock(
                 pos.getX() - clickedPos.getX(),
-                pos.getY() - clickedPos.getY(),
+                pos.getY() - minY,
                 pos.getZ() - clickedPos.getZ(),
                 level.getBlockState(pos)
             ));
@@ -67,13 +70,13 @@ public class SteeringWheelItem extends Item {
             level.removeBlock(pos, false);
         }
 
-        // Spawn raft entity at the clicked block's position
+        // Spawn raft entity: X/Z centered on clicked block, Y at bottom of structure
         RaftEntity raft = BootMod.RAFT_ENTITY.get().create(level);
         if (raft == null) return InteractionResult.FAIL;
 
         raft.moveTo(
             clickedPos.getX() + 0.5,
-            clickedPos.getY(),
+            minY,
             clickedPos.getZ() + 0.5,
             player.getYRot(), 0
         );

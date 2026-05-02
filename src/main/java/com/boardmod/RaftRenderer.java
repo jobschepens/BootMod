@@ -1,6 +1,7 @@
 package com.boardmod;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -8,6 +9,8 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
@@ -42,6 +45,23 @@ public class RaftRenderer extends EntityRenderer<RaftEntity> {
             }
             poseStack.popPose();
         }
+
+        // Render the steering wheel item upright at the entity origin (on top of the helm block)
+        poseStack.pushPose();
+        poseStack.translate(0.0, 1.0, 0.0);         // lift one block up
+        poseStack.mulPose(Axis.YP.rotationDegrees(-yaw)); // face entity's direction
+        poseStack.scale(0.6f, 0.6f, 0.6f);
+        Minecraft.getInstance().getItemRenderer().renderStatic(
+                new ItemStack(BootMod.STEERING_WHEEL.get()),
+                ItemDisplayContext.FIXED,
+                packedLight,
+                OverlayTexture.NO_OVERLAY,
+                poseStack,
+                bufferSource,
+                entity.level(),
+                (int) entity.getId()
+        );
+        poseStack.popPose();
 
         super.render(entity, yaw, partialTick, poseStack, bufferSource, packedLight);
     }
