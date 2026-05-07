@@ -16,6 +16,12 @@ A NeoForge mod for Minecraft 1.21.1 that adds rideable **Snowboard** and **Skate
 - Moves at **10 blocks/sec on any surface**
 - Shift to dismount and recover the item
 
+### Motorboat
+- Craft with 7 planks and 1 iron ingot (`P P` / `PIP` / `PPP`)
+- Right-click to place in water and ride
+- Moves at **12 blocks/sec on water**
+- Shift to dismount and recover the item
+
 ## Requirements
 
 - Minecraft 1.21.1
