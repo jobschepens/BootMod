@@ -22,6 +22,14 @@ A NeoForge mod for Minecraft 1.21.1 that adds rideable **Snowboard** and **Skate
 - Moves at **12 blocks/sec on water**
 - Shift to dismount and recover the item
 
+### Custom Raft (Steering Wheel)
+- Craft a **Steering Wheel** with 3 sticks and 2 logs (` S ` / `SLS` / ` L `)
+- Build a custom shape out of any blocks (maximum 20 blocks)
+- The structure must touch water and cannot touch solid ground
+- Right-click the structure with the Steering Wheel to turn it into a rideable Raft!
+- Moves at **7 blocks/sec on water**
+- Hitting the raft breaks it back into its original blocks and the Steering Wheel
+
 ## Requirements
 
 - Minecraft 1.21.1
