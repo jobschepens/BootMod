@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,8 +42,38 @@ public class RaftEntity extends Entity {
     private static final EntityDataAccessor<CompoundTag> BLOCKS_DATA =
             SynchedEntityData.defineId(RaftEntity.class, EntityDataSerializers.COMPOUND_TAG);
 
-    private static final double WATER_SPEED = 0.35;
-    private static final double LAND_SPEED  = 0.03;
+    private static final EntityDataAccessor<Boolean> HAS_LEVER =
+            SynchedEntityData.defineId(RaftEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final EntityDataAccessor<Boolean> HAS_AUTOPILOT =
+            SynchedEntityData.defineId(RaftEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final double WATER_SPEED  = 0.35;
+    private static final double LAND_SPEED   = 0.03;
+    private static final double LEVER_SPEED  = 0.3;
+    private static final double AUTOPILOT_SPEED = 0.25;
+
+    // Server-side autopilot wander state
+    private float autopilotTargetYaw = 0f;
+    private int   autopilotTurnTimer = 0;
+
+    private static final Field JUMPING_FIELD;
+    static {
+        try {
+            JUMPING_FIELD = LivingEntity.class.getDeclaredField("jumping");
+            JUMPING_FIELD.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException("Could not find jumping field", e);
+        }
+    }
+
+    private static boolean isJumping(Player rider) {
+        try {
+            return (boolean) JUMPING_FIELD.get(rider);
+        } catch (IllegalAccessException e) {
+            return false;
+        }
+    }
 
     // Client-side cache; invalidated whenever the synced data changes
     private List<RaftBlock> cachedBlocks = null;
@@ -65,6 +96,24 @@ public class RaftEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(BLOCKS_DATA, new CompoundTag());
+        builder.define(HAS_LEVER, false);
+        builder.define(HAS_AUTOPILOT, false);
+    }
+
+    public boolean hasLever() {
+        return this.entityData.get(HAS_LEVER);
+    }
+
+    public void setHasLever(boolean value) {
+        this.entityData.set(HAS_LEVER, value);
+    }
+
+    public boolean hasAutopilot() {
+        return this.entityData.get(HAS_AUTOPILOT);
+    }
+
+    public void setAutopilot(boolean value) {
+        this.entityData.set(HAS_AUTOPILOT, value);
     }
 
     // -------------------------------------------------------------------------
@@ -193,9 +242,13 @@ public class RaftEntity extends Entity {
             return;
         }
 
-        // If empty, just float in place
+        // If empty, just float in place (or autopilot)
         if (this.getPassengers().isEmpty()) {
-            applyBuoyancy();
+            if (hasAutopilot()) {
+                tickAutopilot();
+            } else {
+                applyBuoyancy();
+            }
             return;
         }
 
@@ -216,7 +269,17 @@ public class RaftEntity extends Entity {
         double vz = ( Math.cos(yawRad) * forward +  Math.sin(yawRad) * strafe) * speed;
 
         double vy;
-        if (onWater) {
+        if (hasLever()) {
+            boolean jumping = isJumping(rider);
+            boolean sneaking = rider.isShiftKeyDown();
+            if (jumping) {
+                vy = LEVER_SPEED;
+            } else if (sneaking) {
+                vy = -LEVER_SPEED;
+            } else {
+                vy = 0; // hover
+            }
+        } else if (onWater) {
             // Spring toward water surface: converges without oscillation
             double target = getWaterSurfaceTargetY();
             vy = Double.isNaN(target)
@@ -234,6 +297,51 @@ public class RaftEntity extends Entity {
 
         this.resetFallDistance();
         rider.resetFallDistance();
+    }
+
+    /**
+     * Autopilot tick for the raft: wander randomly.
+     */
+    private void tickAutopilot() {
+        boolean onWater = isOnOrInWater();
+
+        if (autopilotTurnTimer <= 0) {
+            float delta = (float)(this.random.nextFloat() * 120f - 60f);
+            autopilotTargetYaw = this.getYRot() + delta;
+            autopilotTurnTimer = 60 + this.random.nextInt(61); // 3–6 sec
+        }
+        autopilotTurnTimer--;
+
+        float currentYaw = this.getYRot();
+        float diff = autopilotTargetYaw - currentYaw;
+        while (diff > 180f)  diff -= 360f;
+        while (diff < -180f) diff += 360f;
+        float step = Math.max(-1.5f, Math.min(1.5f, diff));
+        float newYaw = currentYaw + step;
+        this.setYRot(newYaw);
+        this.yRotO = newYaw;
+
+        double speed = onWater ? AUTOPILOT_SPEED : LAND_SPEED;
+        double yawRad = Math.toRadians(newYaw);
+        double vx = -Math.sin(yawRad) * speed;
+        double vz =  Math.cos(yawRad) * speed;
+
+        double vy;
+        if (onWater) {
+            double target = getWaterSurfaceTargetY();
+            vy = Double.isNaN(target)
+                    ? this.getDeltaMovement().y * 0.5
+                    : Math.max(-0.1, Math.min(0.1, (target - this.getY()) * 0.2));
+        } else {
+            vy = Math.max(this.getDeltaMovement().y - 0.08, -0.5);
+        }
+
+        this.setDeltaMovement(vx, vy, vz);
+        this.move(MoverType.SELF, this.getDeltaMovement());
+
+        double friction = onWater ? 0.87 : 0.91;
+        this.setDeltaMovement(this.getDeltaMovement().multiply(friction, 1.0, friction));
+        this.resetFallDistance();
     }
 
     private void applyBuoyancy() {
@@ -271,9 +379,41 @@ public class RaftEntity extends Entity {
         return !this.isRemoved();
     }
 
-    /** Right-click to remount. Returns sidedSuccess so the server call is always made. */
+    /** Right-click to remount, or attach a lever or autopilot. */
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
+        ItemStack held = player.getItemInHand(hand);
+
+        // Attach lever
+        if (held.getItem() instanceof BoatLeverItem && !hasLever()) {
+            if (!level().isClientSide()) {
+                setHasLever(true);
+                if (!player.getAbilities().instabuild) held.shrink(1);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
+
+        // Attach autopilot
+        if (held.getItem() instanceof AutopilotItem && !hasAutopilot()) {
+            if (!level().isClientSide()) {
+                setAutopilot(true);
+                autopilotTargetYaw = this.getYRot();
+                autopilotTurnTimer = 0;
+                if (!player.getAbilities().instabuild) held.shrink(1);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
+
+        // Sneak + empty hand: remove autopilot
+        if (held.isEmpty() && player.isShiftKeyDown() && hasAutopilot()) {
+            if (!level().isClientSide()) {
+                setAutopilot(false);
+                this.spawnAtLocation(new ItemStack(BootMod.AUTOPILOT.get()));
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
+
+        // Remount
         if (this.getPassengers().isEmpty()) {
             if (!level().isClientSide()) {
                 player.startRiding(this, true);
@@ -289,7 +429,7 @@ public class RaftEntity extends Entity {
         return !this.isRemoved();
     }
 
-    /** Hitting the raft with any tool breaks it and drops the blocks + steering wheel. */
+    /** Hitting the raft with any tool breaks it and drops the blocks + steering wheel + lever. */
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (level().isClientSide()) return true;
@@ -300,13 +440,20 @@ public class RaftEntity extends Entity {
             Block.dropResources(block.state(), level(), dropPos);
         }
         this.spawnAtLocation(new ItemStack(BootMod.STEERING_WHEEL.get()));
+        if (hasLever()) {
+            this.spawnAtLocation(new ItemStack(BootMod.BOAT_LEVER.get()));
+        }
+        if (hasAutopilot()) {
+            this.spawnAtLocation(new ItemStack(BootMod.AUTOPILOT.get()));
+        }
         this.discard();
         return true;
     }
 
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
-        return this.position().add(2.0, 0, 0);
+        // Plaats speler bovenop het vlot zodat ze er niet doorheen vallen
+        return this.position().add(0, bbMaxY + 0.1, 0);
     }
 
     @Override
@@ -321,6 +468,8 @@ public class RaftEntity extends Entity {
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         tag.put("raft_blocks", this.entityData.get(BLOCKS_DATA));
+        tag.putBoolean("HasLever", hasLever());
+        tag.putBoolean("HasAutopilot", hasAutopilot());
     }
 
     @Override
@@ -328,6 +477,8 @@ public class RaftEntity extends Entity {
         if (tag.contains("raft_blocks")) {
             this.entityData.set(BLOCKS_DATA, tag.getCompound("raft_blocks"));
         }
+        setHasLever(tag.getBoolean("HasLever"));
+        setAutopilot(tag.getBoolean("HasAutopilot"));
     }
 
     @Override

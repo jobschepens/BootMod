@@ -69,6 +69,12 @@ public class BootMod {
     public static final DeferredItem<SteeringWheelItem> STEERING_WHEEL = ITEMS.registerItem("steering_wheel",
             SteeringWheelItem::new, new Item.Properties());
 
+    public static final DeferredItem<BoatLeverItem> BOAT_LEVER = ITEMS.registerItem("boat_lever",
+            BoatLeverItem::new, new Item.Properties());
+
+    public static final DeferredItem<AutopilotItem> AUTOPILOT = ITEMS.registerItem("autopilot",
+            AutopilotItem::new, new Item.Properties());
+
     public static final DeferredHolder<EntityType<?>, EntityType<RaftEntity>> RAFT_ENTITY =
             ENTITY_TYPES.register("raft", () -> EntityType.Builder
                     .<RaftEntity>of(RaftEntity::new, MobCategory.MISC)
@@ -86,6 +92,8 @@ public class BootMod {
                 output.accept(SKATEBOARD.get());
                 output.accept(MOTORBOAT.get());
                 output.accept(STEERING_WHEEL.get());
+                output.accept(BOAT_LEVER.get());
+                output.accept(AUTOPILOT.get());
             }).build());
 
     public BootMod(IEventBus modEventBus, ModContainer modContainer) {
