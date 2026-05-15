@@ -7,7 +7,6 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -131,10 +130,10 @@ public class MotorboatEntity extends Entity {
         double vy = this.getDeltaMovement().y;
         if (hasLever()) {
             boolean jumping = isJumping(rider);
-            boolean ctrlDown = rider instanceof ServerPlayer sp && sp.getLastClientInput().sprint();
+            boolean sneaking = rider.isShiftKeyDown();
             if (jumping) {
                 vy = LEVER_SPEED;
-            } else if (ctrlDown) {
+            } else if (sneaking) {
                 vy = -LEVER_SPEED;
             } else {
                 vy = 0; // hover

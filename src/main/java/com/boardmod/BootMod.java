@@ -6,6 +6,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -13,8 +14,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityMountEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -101,5 +105,33 @@ public class BootMod {
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
+        NeoForge.EVENT_BUS.addListener(BootMod::onEntityMount);
+    }
+
+    /**
+     * Prevent vanilla shift-to-dismount when the lever is active and the boat is airborne.
+     * Shift = go down while flying; Shift = dismount only when on water or ground.
+     */
+    @SubscribeEvent
+    public static void onEntityMount(EntityMountEvent event) {
+        if (event.isMounting()) return; // only intercept dismounts
+        if (!(event.getEntityMounting() instanceof Player player)) return;
+        if (!player.isShiftKeyDown()) return;
+
+        net.minecraft.world.entity.Entity vehicle = event.getEntityBeingMounted();
+        boolean leverActive = false;
+        boolean airborne    = false;
+
+        if (vehicle instanceof MotorboatEntity boat && boat.hasLever()) {
+            leverActive = true;
+            airborne    = !boat.isInWater() && !boat.onGround();
+        } else if (vehicle instanceof RaftEntity raft && raft.hasLever()) {
+            leverActive = true;
+            airborne    = !raft.isInWater() && !raft.onGround();
+        }
+
+        if (leverActive && airborne) {
+            event.setCanceled(true);
+        }
     }
 }
