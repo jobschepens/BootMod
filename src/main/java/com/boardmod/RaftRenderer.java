@@ -48,8 +48,8 @@ public class RaftRenderer extends EntityRenderer<RaftEntity> {
 
         // Render the steering wheel item upright at the entity origin (on top of the helm block)
         poseStack.pushPose();
-        poseStack.translate(0.0, 1.0, 0.0);         // lift one block up
-        poseStack.mulPose(Axis.YP.rotationDegrees(-yaw)); // face entity's direction
+        poseStack.translate(0.0, 1.0, 0.0);
+        poseStack.mulPose(Axis.YP.rotationDegrees(-yaw));
         poseStack.scale(0.6f, 0.6f, 0.6f);
         Minecraft.getInstance().getItemRenderer().renderStatic(
                 new ItemStack(BootMod.STEERING_WHEEL.get()),
@@ -62,6 +62,26 @@ public class RaftRenderer extends EntityRenderer<RaftEntity> {
                 (int) entity.getId()
         );
         poseStack.popPose();
+
+        // Render the boat lever to the right of the steering wheel when attached
+        if (entity.hasLever()) {
+            poseStack.pushPose();
+            poseStack.translate(0.6, 1.1, 0.0);             // naast het stuurwiel
+            poseStack.mulPose(Axis.YP.rotationDegrees(-yaw));
+            poseStack.mulPose(Axis.ZP.rotationDegrees(30f)); // licht gekanteld
+            poseStack.scale(0.45f, 0.45f, 0.45f);
+            Minecraft.getInstance().getItemRenderer().renderStatic(
+                    new ItemStack(BootMod.BOAT_LEVER.get()),
+                    ItemDisplayContext.FIXED,
+                    packedLight,
+                    OverlayTexture.NO_OVERLAY,
+                    poseStack,
+                    bufferSource,
+                    entity.level(),
+                    (int) entity.getId() + 1
+            );
+            poseStack.popPose();
+        }
 
         super.render(entity, yaw, partialTick, poseStack, bufferSource, packedLight);
     }

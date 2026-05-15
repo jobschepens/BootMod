@@ -7,6 +7,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -102,10 +103,8 @@ public class MotorboatEntity extends Entity {
         // No rider
         if (this.getPassengers().isEmpty()) {
             if (hasAutopilot()) {
-                // Autopilot active: wander around without a rider
                 tickAutopilot();
             } else {
-                // Float/drift in place — do NOT drop or discard
                 applyIdlePhysics();
             }
             return;
@@ -132,10 +131,10 @@ public class MotorboatEntity extends Entity {
         double vy = this.getDeltaMovement().y;
         if (hasLever()) {
             boolean jumping = isJumping(rider);
-            boolean sneaking = rider.isShiftKeyDown();
+            boolean ctrlDown = rider instanceof ServerPlayer sp && sp.getLastClientInput().sprint();
             if (jumping) {
                 vy = LEVER_SPEED;
-            } else if (sneaking) {
+            } else if (ctrlDown) {
                 vy = -LEVER_SPEED;
             } else {
                 vy = 0; // hover
@@ -303,15 +302,16 @@ public class MotorboatEntity extends Entity {
             }
         }
 
-        // Gewone rechtsklik met lege hand: instappen
-        if (held.isEmpty() && this.getPassengers().isEmpty()) {
+        // Gewone rechtsklik met lege hand: instappen (nooit bij sneaken → anders val je erdoorheen)
+        if (held.isEmpty() && !player.isShiftKeyDown() && this.getPassengers().isEmpty()) {
             if (!level().isClientSide()) {
                 player.startRiding(this, true);
             }
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
 
-        return InteractionResult.PASS;
+        // Voorkom dat andere items (zoals MotorboatItem) hun use() afvuren op de boot
+        return InteractionResult.CONSUME;
     }
 
     @Override

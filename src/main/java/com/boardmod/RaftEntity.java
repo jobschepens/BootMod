@@ -9,11 +9,11 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
@@ -271,10 +271,10 @@ public class RaftEntity extends Entity {
         double vy;
         if (hasLever()) {
             boolean jumping = isJumping(rider);
-            boolean sneaking = rider.isShiftKeyDown();
+            boolean ctrlDown = rider instanceof ServerPlayer sp && sp.getLastClientInput().sprint();
             if (jumping) {
                 vy = LEVER_SPEED;
-            } else if (sneaking) {
+            } else if (ctrlDown) {
                 vy = -LEVER_SPEED;
             } else {
                 vy = 0; // hover
@@ -379,48 +379,43 @@ public class RaftEntity extends Entity {
         return !this.isRemoved();
     }
 
-    /** Right-click to remount, or attach a lever or autopilot. */
+    /** Right-click to remount, or sneak+click to attach lever/autopilot. */
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
         ItemStack held = player.getItemInHand(hand);
 
-        // Attach lever
-        if (held.getItem() instanceof BoatLeverItem && !hasLever()) {
-            if (!level().isClientSide()) {
-                setHasLever(true);
-                if (!player.getAbilities().instabuild) held.shrink(1);
+        if (player.isShiftKeyDown()) {
+            // Sneak + lever: bevestig hendel
+            if (held.getItem() instanceof BoatLeverItem && !hasLever()) {
+                if (!level().isClientSide()) {
+                    setHasLever(true);
+                    if (!player.getAbilities().instabuild) held.shrink(1);
+                }
+                return InteractionResult.sidedSuccess(level().isClientSide());
             }
-            return InteractionResult.sidedSuccess(level().isClientSide());
+
+            // Sneak + autopilot: bevestig autopilot
+            if (held.getItem() instanceof AutopilotItem && !hasAutopilot()) {
+                if (!level().isClientSide()) {
+                    setAutopilot(true);
+                    autopilotTargetYaw = this.getYRot();
+                    autopilotTurnTimer = 0;
+                    if (!player.getAbilities().instabuild) held.shrink(1);
+                }
+                return InteractionResult.sidedSuccess(level().isClientSide());
+            }
         }
 
-        // Attach autopilot
-        if (held.getItem() instanceof AutopilotItem && !hasAutopilot()) {
-            if (!level().isClientSide()) {
-                setAutopilot(true);
-                autopilotTargetYaw = this.getYRot();
-                autopilotTurnTimer = 0;
-                if (!player.getAbilities().instabuild) held.shrink(1);
-            }
-            return InteractionResult.sidedSuccess(level().isClientSide());
-        }
-
-        // Sneak + empty hand: remove autopilot
-        if (held.isEmpty() && player.isShiftKeyDown() && hasAutopilot()) {
-            if (!level().isClientSide()) {
-                setAutopilot(false);
-                this.spawnAtLocation(new ItemStack(BootMod.AUTOPILOT.get()));
-            }
-            return InteractionResult.sidedSuccess(level().isClientSide());
-        }
-
-        // Remount
-        if (this.getPassengers().isEmpty()) {
+        // Gewone rechtsklik + lege hand: instappen (nooit bij sneaken → anders val je erdoorheen)
+        if (held.isEmpty() && !player.isShiftKeyDown() && this.getPassengers().isEmpty()) {
             if (!level().isClientSide()) {
                 player.startRiding(this, true);
             }
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        return InteractionResult.PASS;
+
+        // Voorkom dat andere items hun use() afvuren op het vlot
+        return InteractionResult.CONSUME;
     }
 
     /** Makes the raft's bounding box solid so players can stand on it after dismounting. */
@@ -448,6 +443,12 @@ public class RaftEntity extends Entity {
         }
         this.discard();
         return true;
+    }
+
+    @Override
+    public Vec3 getPassengerRidingPosition(Entity passenger) {
+        // Speler staat bovenop het vlot (voeten op bbMaxY)
+        return this.position().add(0, bbMaxY, 0);
     }
 
     @Override

@@ -15,7 +15,7 @@ import java.util.*;
 
 public class SteeringWheelItem extends Item {
 
-    private static final int MAX_BLOCKS = 20;
+    private static final int MAX_BLOCKS = 100;
 
     public SteeringWheelItem(Properties properties) {
         super(properties);
@@ -40,7 +40,7 @@ public class SteeringWheelItem extends Item {
         List<BlockPos> structure = scanStructure(level, clickedPos);
         if (structure == null) {
             player.displayClientMessage(
-                Component.literal("Das Gestell ist zu groß (max 20 Blöcke) oder berührt den Boden!"), true);
+                Component.literal("Das Gestell ist zu groß (max 100 Blöcke) oder berührt den Boden!"), true);
             return InteractionResult.FAIL;
         }
 
